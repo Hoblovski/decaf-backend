@@ -6,10 +6,3 @@ package backend
 class Library {
   def someLibraryMethod(): Boolean = true
 }
-
-object Main {
-  def main(args: Array[String]) = {
-    println("fuck")
-    ()
-  }
-}

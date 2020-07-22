@@ -12,10 +12,6 @@ Ident
     : IdentLead WordChar*
     ;
 
-StrLit
-    : '"' SChar* '"'
-    ;
-
 fragment
 IdentLead
     : [a-zA-Z_]
@@ -31,28 +27,25 @@ Digit
     : [0-9]
     ;
 
-fragment
-SChar
-    : ~["\\\r\n]
-    | EscapeSequence
-    | '\\\n'   // Added line
-    | '\\\r\n' // Added line
-    ;
-
-fragment
-EscapeSequence
-    : SimpleEscapeSequence
-    ;
-
-fragment
-SimpleEscapeSequence
-    : '\\' ['"?abfnrtv\\]
-    ;
-
 Whitespace
     : [ \t]+ -> skip
     ;
 
 Newline
     : ( '\r' '\n'? | '\n') -> skip
+    ;
+
+StrLit
+    : '"' StrChar* '"'
+    ;
+
+fragment
+StrChar
+    :   ~["\\\r\n]
+    |   EscapeChar
+    ;
+
+fragment
+EscapeChar
+    :   '\\' ['"?abfnrtv\\]
     ;

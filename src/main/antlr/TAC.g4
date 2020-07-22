@@ -3,7 +3,7 @@ grammar TAC;
 import CommonLex;
 
 prog
-    : vtabDef* funcDef*
+    : vtabDef* funcDef* EOF
     ;
 
 vtabDef
