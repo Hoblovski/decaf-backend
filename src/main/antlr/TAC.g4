@@ -62,6 +62,7 @@ vtabLabel
 
 funcLabel
     : 'FUNCTION' '<' className=Ident '.' funcName=Ident '>'
+    | 'main'
     ;
 
 parentLabel

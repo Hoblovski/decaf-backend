@@ -18,6 +18,19 @@ object Main {
 
     val visitor = new TACParse()
     visitor.visit(parser.prog())
-    println(visitor.vtabs)
+
+    for (v <- visitor.vtabs) {
+      println(v)
+    }
+
+    for (f <- visitor.funcs) {
+      println("\n\n")
+      println(f.label)
+      for (bb <- f.bbs) {
+        for (i <- bb.instrs)
+          println(s"  ${i}")
+        println("")
+      }
+    }
   }
 }

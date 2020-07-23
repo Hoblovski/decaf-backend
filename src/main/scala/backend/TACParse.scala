@@ -1,5 +1,7 @@
 package backend
-import backend.TACParser._
+import java.net.NoRouteToHostException
+
+import backend.{TACParser => P}
 import org.antlr.v4.runtime.tree.TerminalNode
 
 import scala.jdk.CollectionConverters._
@@ -12,11 +14,19 @@ class TACParse extends TACBaseVisitor[()] {
   val funcs = mutable.ArrayBuffer.empty[Func]
   val instrs = mutable.ArrayBuffer.empty[Instr]
 
-  private def tempNo(s: TerminalNode) = {
-    s.getText.drop(2).toInt
+  private def mkTemp(s: TerminalNode): Temp = {
+    Temp( s.getText.drop(2).toInt)
   }
 
-  override def visitVtabDef(ctx: VtabDefContext): Unit = {
+  private def escaped(str: String): String = {
+    str // TODO
+  }
+
+  private def mkMemOperand(ctx: P.MemOperandContext): (Temp, Int) = {
+    (mkTemp(ctx.Temp), (if (ctx.Op.getText == "+") 1 else -1) * ctx.Number.getText.toInt)
+  }
+
+  override def visitVtabDef(ctx: P.VtabDefContext): Unit = {
     val name = ctx.className.getText
     val parentName = {
       val t = ctx.parentLabel.vtabLabel
@@ -29,15 +39,77 @@ class TACParse extends TACBaseVisitor[()] {
     vtabs += VTable(name, parentName, labels.toArray)
   }
 
-  override def visitFuncDef(ctx: FuncDefContext): Unit = {
+  override def visitFuncDef(ctx: P.FuncDefContext): Unit = {
     instrs.clear()
     visitChildren(ctx)
-    val label = FuncLabel(ctx.funcLabel.className.getText,
-      ctx.funcLabel.funcName.getText)
+    val f = ctx.funcLabel()
+    val label = if (f.className == null) MainFuncLabel() else
+      FuncLabel(f.className.getText, f.funcName.getText)
     funcs += new Func(label, instrs.toSeq)
   }
 
-  override def visitAssign(ctx: AssignContext): Unit = {
-    instrs += Assign(tempNo(ctx.Temp(0)), tempNo(ctx.Temp(1)));
+  override def visitAssign(ctx: P.AssignContext): Unit = {
+    instrs += Assign(mkTemp(ctx.Temp(0)), mkTemp(ctx.Temp(1)))
+  }
+
+  override def visitLoadVTbl(ctx: TACParser.LoadVTblContext): Unit = {
+    instrs += LoadVTab(mkTemp(ctx.Temp()), ctx.vtabLabel.className.getText)
+  }
+
+  override def visitLoadImm(ctx: TACParser.LoadImmContext): Unit = {
+    instrs += LoadImm(mkTemp(ctx.Temp()), ctx.Number.getText.toInt)
+  }
+
+  override def visitLoadStrLit(ctx: TACParser.LoadStrLitContext): Unit = {
+    instrs += LoadStrLit(mkTemp(ctx.Temp()), escaped(ctx.StrLit.getText))
+  }
+
+  override def visitUnary(ctx: TACParser.UnaryContext): Unit = {
+    instrs += Unary(mkTemp(ctx.Temp(0)), UnaryOp.from(ctx.unaryOp.getText), mkTemp(ctx.Temp(1)))
+  }
+
+  override def visitBinary(ctx: TACParser.BinaryContext): Unit = {
+    instrs += Binary(mkTemp(ctx.Temp(0)), BinaryOp.from(ctx.binaryOp.getText), mkTemp(ctx.Temp(1)), mkTemp(ctx.Temp(1)))
+  }
+
+  override def visitBranch(ctx: TACParser.BranchContext): Unit = {
+    instrs += Branch(Label(ctx.label.getText))
+  }
+
+  override def visitCondBranch(ctx: TACParser.CondBranchContext): Unit = {
+    instrs += CondBranch(mkTemp(ctx.Temp()), CondBranchOp.from(ctx.condBrOp.getText), Label(ctx.label.getText))
+  }
+
+  override def visitReturn(ctx: TACParser.ReturnContext): Unit = {
+    val dst = if (ctx.Temp == null) None else Some(mkTemp(ctx.Temp))
+    instrs += Return(dst)
+  }
+
+  override def visitParm(ctx: TACParser.ParmContext): Unit = {
+    instrs += Parm(mkTemp(ctx.Temp))
+  }
+
+  override def visitIndirectCall(ctx: TACParser.IndirectCallContext): Unit = {
+    val dst = if (ctx.Temp(0) == null) None else Some(mkTemp(ctx.Temp(0)))
+    instrs += IndirectCall(dst, mkTemp(ctx.Temp(1)))
+  }
+
+  override def visitDirectCall(ctx: TACParser.DirectCallContext): Unit = {
+    val dst = if (ctx.Temp() == null) None else Some(mkTemp(ctx.Temp()))
+    instrs += DirectCall(dst, Label(ctx.label.getText))
+  }
+
+  override def visitLoad(ctx: TACParser.LoadContext): Unit = {
+    val memOp = mkMemOperand(ctx.memOperand())
+    instrs += Load(mkTemp(ctx.Temp()), memOp._1, memOp._2)
+  }
+
+  override def visitStore(ctx: TACParser.StoreContext): Unit = {
+    val memOp = mkMemOperand(ctx.memOperand())
+    instrs += Store(mkTemp(ctx.Temp()), memOp._1, memOp._2);
+  }
+
+  override def visitMark(ctx: TACParser.MarkContext): Unit = {
+    instrs += Mark(Label(ctx.label().getText))
   }
 }
