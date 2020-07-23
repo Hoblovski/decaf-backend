@@ -18,16 +18,23 @@ class TACParse extends TACBaseVisitor[()] {
     Temp( s.getText.drop(2).toInt)
   }
 
-  private def escaped(str: String): String = {
-    str // TODO
-  }
-
   private def mkMemOperand(ctx: P.MemOperandContext): (Temp, Int) = {
     (mkTemp(ctx.Temp), (if (ctx.Op.getText == "+") 1 else -1) * ctx.Number.getText.toInt)
   }
 
+  private def mkFuncLabel(ctx: P.FuncLabelContext): FuncLabel = {
+    if (ctx.className != null)
+      FuncLabel(ctx.className.getText, ctx.funcName.getText)
+    else ctx.getText match {
+      case "main" => MainFuncLabel()
+      case s => IntrinsicFuncLabel(s)
+    }
+  }
+
+  def getTACProg(): TACProg = new TACProg(vtabs.toSeq, funcs.toSeq)
+
   override def visitVtabDef(ctx: P.VtabDefContext): Unit = {
-    val name = ctx.className.getText
+    val name = Util.unquoteString(ctx.className.getText)
     val parentName = {
       val t = ctx.parentLabel.vtabLabel
       if (t == null) None else Some(t.className.getText)
@@ -61,7 +68,7 @@ class TACParse extends TACBaseVisitor[()] {
   }
 
   override def visitLoadStrLit(ctx: TACParser.LoadStrLitContext): Unit = {
-    instrs += LoadStrLit(mkTemp(ctx.Temp()), escaped(ctx.StrLit.getText))
+    instrs += LoadStrLit(mkTemp(ctx.Temp()), Util.escaped(Util.unquoteString(ctx.StrLit.getText)))
   }
 
   override def visitUnary(ctx: TACParser.UnaryContext): Unit = {
@@ -69,7 +76,7 @@ class TACParse extends TACBaseVisitor[()] {
   }
 
   override def visitBinary(ctx: TACParser.BinaryContext): Unit = {
-    instrs += Binary(mkTemp(ctx.Temp(0)), BinaryOp.from(ctx.binaryOp.getText), mkTemp(ctx.Temp(1)), mkTemp(ctx.Temp(1)))
+    instrs += Binary(mkTemp(ctx.Temp(0)), BinaryOp.from(ctx.binaryOp.getText), mkTemp(ctx.Temp(1)), mkTemp(ctx.Temp(2)))
   }
 
   override def visitBranch(ctx: TACParser.BranchContext): Unit = {
@@ -90,13 +97,16 @@ class TACParse extends TACBaseVisitor[()] {
   }
 
   override def visitIndirectCall(ctx: TACParser.IndirectCallContext): Unit = {
-    val dst = if (ctx.Temp(0) == null) None else Some(mkTemp(ctx.Temp(0)))
-    instrs += IndirectCall(dst, mkTemp(ctx.Temp(1)))
+    val (dst, src) = if (ctx.Temp(1) == null)
+      (None, mkTemp(ctx.Temp(0)))
+    else
+      (Some(mkTemp(ctx.Temp(0))), mkTemp(ctx.Temp(1)))
+    instrs += IndirectCall(dst, src)
   }
 
   override def visitDirectCall(ctx: TACParser.DirectCallContext): Unit = {
     val dst = if (ctx.Temp() == null) None else Some(mkTemp(ctx.Temp()))
-    instrs += DirectCall(dst, Label(ctx.label.getText))
+    instrs += DirectCall(dst, mkFuncLabel(ctx.funcLabel()))
   }
 
   override def visitLoad(ctx: TACParser.LoadContext): Unit = {

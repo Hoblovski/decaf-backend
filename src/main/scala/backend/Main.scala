@@ -19,18 +19,7 @@ object Main {
     val visitor = new TACParse()
     visitor.visit(parser.prog())
 
-    for (v <- visitor.vtabs) {
-      println(v)
-    }
-
-    for (f <- visitor.funcs) {
-      println("\n\n")
-      println(f.label)
-      for (bb <- f.bbs) {
-        for (i <- bb.instrs)
-          println(s"  ${i}")
-        println("")
-      }
-    }
+    val prog = visitor.getTACProg()
+    (new TACPrint).visitProg(prog)
   }
 }

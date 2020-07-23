@@ -26,7 +26,7 @@ cmd
     | 'return' Temp? # Return
     | 'parm' Temp # Parm
     | (Temp '=')? 'call' Temp # IndirectCall
-    | (Temp '=')? 'call' label # DirectCall
+    | (Temp '=')? 'call' funcLabel # DirectCall
     | Temp '=' memOperand # Load
     | memOperand '=' Temp # Store
     | 'memo' StrLit # Memo
@@ -62,7 +62,7 @@ vtabLabel
 
 funcLabel
     : 'FUNCTION' '<' className=Ident '.' funcName=Ident '>'
-    | 'main'
+    | Ident
     ;
 
 parentLabel
